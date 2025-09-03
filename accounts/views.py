@@ -1,15 +1,9 @@
+from django.urls import path
+from django.contrib.auth import views as auth_views
+from .views import register_view
 
-from django.shortcuts import render, redirect
-from django.contrib.auth import login
-from .forms import RegisterForm
-
-def register_view(request):
-    if request.method == "POST":
-        form = RegisterForm(request.POST)
-        if form.is_valid():
-            user = form.save()
-            login(request, user)
-            return redirect("dashboard")
-    else:
-        form = RegisterForm()
-    return render(request, "accounts/register.html", {"form": form})
+urlpatterns = [
+    path("login/", auth_views.LoginView.as_view(template_name="accounts/login.html"), name="login"),
+    path("logout/", auth_views.LogoutView.as_view(next_page="login"), name="logout"),
+    path("register/", register_view, name="register"),
+]

@@ -1,6 +1,7 @@
-
 from django.urls import path
 from .views import dashboard, export_excel, export_pdf
+
+app_name = "marks"
 
 urlpatterns = [
     path("dashboard/", dashboard, name="dashboard"),
