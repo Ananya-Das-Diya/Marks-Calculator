@@ -1,159 +1,126 @@
-{% extends "base.html" %}
-{% load static %}
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
+from django.http import HttpResponse
+from .models import Student, MarkField, Mark
+from .forms import StudentForm, MarkFieldForm
+import openpyxl
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+from reportlab.lib import colors
 
-{% block content %}
-<style>
-  body {
-    background: linear-gradient(135deg, #1abc9c, #3498db);
-    min-height: 100vh;
-  }
-  .glass-card {
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 15px;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-    color: #fff;
-  }
-  .glass-card h5 {
-    color: #fff !important;
-  }
-  .mark-input {
-    background: rgba(255, 255, 255, 0.8);
-    border: none;
-    border-radius: 8px;
-    text-align: center;
-  }
-  .table-hover tbody tr:hover {
-    background-color: rgba(52, 152, 219, 0.15);
-    transition: 0.3s;
-  }
-  .overall {
-    font-weight: bold;
-    font-size: 1rem;
-  }
-</style>
 
-<div class="container mt-5 animate__animated animate__fadeIn">
-  <h2 class="text-center mb-4 text-light">📊 Marks Dashboard</h2>
+@login_required
+def dashboard(request):
+    students = Student.objects.filter(teacher=request.user)
+    fields = MarkField.objects.filter(teacher=request.user)
 
-  <!-- Forms for adding student and fields -->
-  <div class="row mb-4">
-    <div class="col-md-6">
-      <div class="glass-card shadow p-3">
-        <h5>➕ Add Student</h5>
-        <form method="post" class="animate__animated animate__fadeInLeft">
-          {% csrf_token %}
-          {{ student_form.as_p }}
-          <button type="submit" name="add_student" class="btn btn-success btn-sm">
-            ➕ Add Student
-          </button>
-        </form>
-      </div>
-    </div>
-    <div class="col-md-6">
-      <div class="glass-card shadow p-3">
-        <h5>➕ Add Field</h5>
-        <form method="post" class="animate__animated animate__fadeInRight">
-          {% csrf_token %}
-          {{ field_form.as_p }}
-          <button type="submit" name="add_field" class="btn btn-info btn-sm">
-            ➕ Add Field
-          </button>
-        </form>
-      </div>
-    </div>
-  </div>
+    if request.method == "POST":
+        if "add_student" in request.POST:
+            sform = StudentForm(request.POST)
+            if sform.is_valid():
+                stu = sform.save(commit=False)
+                stu.teacher = request.user
+                stu.save()
+            return redirect("dashboard")
 
-  <!-- Marks Table -->
-  <form method="post">
-    {% csrf_token %}
-    <div class="glass-card shadow-lg p-4 animate__animated animate__zoomIn">
-      <table class="table table-hover table-bordered text-center align-middle text-light">
-        <thead class="table-dark">
-          <tr>
-            <th>Student</th>
-            {% for f in fields %}
-              <th>{{ f.name }}</th>
-            {% endfor %}
-            <th>Overall</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for data in students_data %}
-          <tr class="student-row">
-            <td><b>{{ data.student.name }}</b></td>
-            {% for m in data.marks %}
-              <td>
-                <input type="number" 
-                       name="mark_{{ data.student.id }}_{{ m.field.id }}" 
-                       value="{{ m.score }}" 
-                       class="form-control text-center mark-input" 
-                       min="0">
-              </td>
-            {% endfor %}
-            <td>
-              <span class="badge bg-primary overall fs-6 px-3 py-2">
-                {{ data.overall }}
-              </span>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      <div class="text-end">
-        <button type="submit" name="save_marks" class="btn btn-primary animate__animated animate__pulse animate__infinite">
-          💾 Save Marks
-        </button>
-      </div>
-    </div>
-  </form>
+        elif "add_field" in request.POST:
+            fform = MarkFieldForm(request.POST)
+            if fform.is_valid():
+                fld = fform.save(commit=False)
+                fld.teacher = request.user
+                fld.save()
+            return redirect("dashboard")
 
-  <!-- Summary -->
-  <div class="mt-4 text-center animate__animated animate__fadeInUp text-light">
-    <h5>
-      Class Average: <span id="class-average" class="fw-bold text-warning">{{ avg_score }}</span>
-    </h5>
-    <a href="{% url 'export_excel' %}" class="btn btn-outline-light btn-sm me-2">
-      ⬇ Export Excel
-    </a>
-    <a href="{% url 'export_pdf' %}" class="btn btn-outline-light btn-sm">
-      ⬇ Export PDF
-    </a>
-  </div>
-</div>
+        elif "save_marks" in request.POST:
+            for s in students:
+                for f in fields:
+                    field_name = f"mark_{s.id}_{f.id}"
+                    score = request.POST.get(field_name)
+                    if score is not None:
+                        try:
+                            score_val = int(score)
+                        except ValueError:
+                            score_val = 0
+                        mark, _ = Mark.objects.get_or_create(student=s, field=f)
+                        mark.score = score_val
+                        mark.save()
+            return redirect("dashboard")
 
-<!-- JavaScript for auto calculation & highlight -->
-<script>
-document.addEventListener("input", function(e) {
-  if (e.target.classList.contains("mark-input")) {
-    const row = e.target.closest("tr");
-    let total = 0;
+    students_data, totals = [], []
+    for s in students:
+        row_marks, total = [], 0
+        for f in fields:
+            m, _ = Mark.objects.get_or_create(student=s, field=f, defaults={"score": 0})
+            row_marks.append(m)
+            total += m.score
+        students_data.append({"student": s, "marks": row_marks, "overall": total})
+        totals.append(total)
 
-    row.querySelectorAll(".mark-input").forEach(input => {
-      total += parseFloat(input.value) || 0;
-    });
+    avg_score = round(sum(totals) / len(totals), 2) if totals else 0
 
-    const overallBadge = row.querySelector(".overall");
-    overallBadge.textContent = total;
+    return render(request, "marks/dashboard.html", {
+        "students": students,
+        "fields": fields,
+        "students_data": students_data,
+        "avg_score": avg_score,
+        "student_form": StudentForm(),
+        "field_form": MarkFieldForm(),
+    })
 
-    // Highlight row if marks updated
-    row.classList.add("table-success", "animate__animated", "animate__flash");
-    setTimeout(() => {
-      row.classList.remove("animate__animated", "animate__flash");
-    }, 1000);
 
-    // 🔥 Recalculate class average dynamically
-    let allTotals = [];
-    document.querySelectorAll(".overall").forEach(badge => {
-      allTotals.push(parseFloat(badge.textContent) || 0);
-    });
-    const avg = allTotals.length > 0
-      ? (allTotals.reduce((a, b) => a + b, 0) / allTotals.length).toFixed(2)
-      : 0;
+@login_required
+def export_excel(request):
+    students = Student.objects.filter(teacher=request.user)
+    fields = MarkField.objects.filter(teacher=request.user)
 
-    document.querySelector("#class-average").textContent = avg;
-  }
-});
-</script>
-{% endblock %}
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Marks"
+    ws.append(["Student"] + [f.name for f in fields] + ["Overall"])
+
+    for s in students:
+        row, total = [s.name], 0
+        for f in fields:
+            m = Mark.objects.filter(student=s, field=f).first()
+            score = m.score if m else 0
+            row.append(score)
+            total += score
+        row.append(total)
+        ws.append(row)
+
+    resp = HttpResponse(content_type="application/vnd.ms-excel")
+    resp["Content-Disposition"] = 'attachment; filename="marks.xlsx"'
+    wb.save(resp)
+    return resp
+
+
+@login_required
+def export_pdf(request):
+    students = Student.objects.filter(teacher=request.user)
+    fields = MarkField.objects.filter(teacher=request.user)
+
+    data = [["Student"] + [f.name for f in fields] + ["Overall"]]
+    for s in students:
+        row, total = [s.name], 0
+        for f in fields:
+            m = Mark.objects.filter(student=s, field=f).first()
+            score = m.score if m else 0
+            row.append(score)
+            total += score
+        row.append(total)
+        data.append(row)
+
+    resp = HttpResponse(content_type="application/pdf")
+    resp["Content-Disposition"] = 'attachment; filename="marks.pdf"'
+
+    doc = SimpleDocTemplate(resp)
+    table = Table(data)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.darkgray),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("GRID", (0, 0), (-1, -1), 1, colors.black),
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
+    ]))
+    doc.build([table])
+    return resp
