@@ -2,11 +2,17 @@ services:
   - type: web
     name: marks-calculator
     env: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn marks_calculator_project.wsgi --log-file -"
-    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn marks_calculator.wsgi:application --log-file -
     envVars:
-      - key: DJANGO_SETTINGS_MODULE
-        value: marks_calculator_project.settings
-      - key: PYTHON_VERSION
-        value: 3.11
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: False
+      - key: DATABASE_URL
+        fromDatabase:
+          name: marks-db
+          property: connectionString
+databases:
+  - name: marks-db
+    plan: free

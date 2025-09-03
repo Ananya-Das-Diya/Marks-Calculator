@@ -4,10 +4,13 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Secret key from environment, fallback for local dev
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-demo-key")
 
+# Debug mode (set DEBUG=False in Render)
 DEBUG = os.getenv("DEBUG", "False") == "True"
 
+# Allow all hosts on Render, restrict in production if needed
 ALLOWED_HOSTS = ["*"]
 
 INSTALLED_APPS = [
@@ -52,7 +55,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "marks_calculator.wsgi.application"
 
-# Default SQLite for local dev, but Render will override with Postgres
+# Default database (SQLite for local dev)
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
@@ -60,23 +63,32 @@ DATABASES = {
     }
 }
 
+# Override with PostgreSQL if DATABASE_URL is set (Render will provide this)
 DATABASES["default"] = dj_database_url.config(
-    default=DATABASES["default"], conn_max_age=600, ssl_require=True
+    default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+    conn_max_age=600,
+    ssl_require=False,  # change to True when using PostgreSQL with SSL
 )
 
+# Password validation (optional, disabled for simplicity)
 AUTH_PASSWORD_VALIDATORS = []
 
+# Internationalization
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 
+# Static files (served by Whitenoise on Render)
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
+# Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# Authentication redirects
 LOGIN_REDIRECT_URL = "dashboard"
 LOGOUT_REDIRECT_URL = "login"
+
