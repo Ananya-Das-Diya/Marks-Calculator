@@ -1,2 +1,3 @@
-web: gunicorn marks_calculator.wsgi:application
+web: gunicorn marks_calculator.wsgi --log-file -
+
 
