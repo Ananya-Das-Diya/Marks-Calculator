@@ -13,9 +13,6 @@
     box-shadow: 0 8px 32px rgba(0,0,0,0.3);
     color: #fff;
   }
-  .glass-card h2 {
-    color: #fff !important;
-  }
   .form-control {
     background: rgba(255,255,255,0.8) !important;
     border: none;
@@ -28,15 +25,11 @@
     font-weight: 500;
     color: #f1f1f1;
   }
-  ul, .helptext, .errorlist {
-    display: none !important; /* hide verification & error messages */
-  }
-  .credit {
-    margin-top: 20px;
+  .errorlist {
+    color: #ffcccc;
     font-size: 0.9rem;
-    color: #f1f1f1;
-    text-align: center;
-    font-style: italic;
+    margin-top: -8px;
+    margin-bottom: 10px;
   }
 </style>
 
@@ -49,17 +42,23 @@
         <div class="mb-3">
           <label for="{{ field.id_for_label }}">{{ field.label }}</label>
           {{ field }}
+          {% if field.errors %}
+            <div class="errorlist">{{ field.errors }}</div>
+          {% endif %}
         </div>
       {% endfor %}
-      <button type="submit" 
-              class="btn btn-primary w-100 animate__animated animate__pulse animate__infinite">
+
+      {% if form.non_field_errors %}
+        <div class="errorlist">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      <button type="submit" class="btn btn-primary w-100 animate__animated animate__pulse animate__infinite">
         ✨ Register
       </button>
     </form>
-    <div class="credit">
-      This project is made by <b>Ananya Das Diya</b> & <b>Swagato Roy Pran</b>
+    <div class="text-center mt-3">
+      Already have an account? <a href="{% url 'login' %}" class="text-warning">Login</a>
     </div>
   </div>
 </div>
 {% endblock %}
-
